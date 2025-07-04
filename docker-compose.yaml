@@ -5,6 +5,7 @@ services:
     image: ghcr.io/siderolabs/omni:v0.51.0
     container_name: omni
     restart: always
+    privileged: true
     cap_add:
       - NET_ADMIN
     devices:
