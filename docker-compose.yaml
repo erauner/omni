@@ -11,6 +11,7 @@ services:
       - /dev/net/tun
     ports:
       - 50180:50180/udp
+    env_file: .env
     command:
       - --account-id=${OMNI_ACCOUNT_ID} 
       - --name=onprem-omni
@@ -19,7 +20,7 @@ services:
       - --bind-addr=0.0.0.0:4443
       - --machine-api-bind-addr=0.0.0.0:8090
       - --k8s-proxy-bind-addr=0.0.0.0:8100
-      - --advertised-api-url=https://omni.${DOMAIN}/
+      - --advertised-api-url=https://omni.${DOMAIN}
       - --siderolink-api-advertised-url=https://omni.${DOMAIN}:8090/
       - --siderolink-wireguard-advertised-addr=omni.${DOMAIN}:50180
       - --advertised-kubernetes-proxy-url=https://omni.${DOMAIN}:8100/
@@ -30,39 +31,30 @@ services:
       - --initial-users=${OMNI_INITIAL_USER}
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.omni.rule=HostRegexp(`omni.${DOMAIN}`) || HostRegexp(`.+.omni.${DOMAIN}`)"
-      - "traefik.http.routers.omni.tls.domains[0].main=${DOMAIN}"
-      - "traefik.http.routers.omni.tls.domains[0].main=*.${DOMAIN}"
-      - "traefik.http.routers.omni.tls.domains[1].main=omni.${DOMAIN}"
-      - "traefik.http.routers.omni.tls.domains[1].main=*.omni.${DOMAIN}"
+      - "traefik.http.routers.omni.rule=Host(`omni.${DOMAIN}`)"
       - "traefik.http.routers.omni.entrypoints=websecure"
       - "traefik.http.routers.omni.tls=true"
-      - "traefik.http.routers.omni.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.omni.service=omni"
+      - "traefik.http.routers.omni.tls.domains[0].main=${DOMAIN}"
+      - "traefik.http.routers.omni.tls.domains[0].sans=*.${DOMAIN}"
       - "traefik.http.services.omni.loadbalancer.server.port=4443"
       - "traefik.http.services.omni.loadbalancer.server.scheme=https"
-      - "traefik.http.services.omni.loadbalancer.server.scheme=h2c"
       # Omni API routing rule for consolidated routing
       - "traefik.http.routers.mapi.rule=Host(`omni.${DOMAIN}`) || Host(`192.168.1.17`)"
       - "traefik.http.routers.mapi.entrypoints=mapi"
       - "traefik.http.routers.mapi.tls=true"
       - "traefik.http.routers.mapi.tls.domains[0].main=omni.${DOMAIN}"
-      - "traefik.http.routers.mapi.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.mapi.service=mapi"
       - "traefik.http.services.mapi.loadbalancer.server.port=8090"
-      - "traefik.http.services.mapi.loadbalancer.server.scheme=h2c"  
+      - "traefik.http.services.mapi.loadbalancer.server.scheme=h2c"
       # Omni Kube routing rule for consolidated routing
       - "traefik.http.routers.kproxy.rule=Host(`omni.${DOMAIN}`)"
       - "traefik.http.routers.kproxy.entrypoints=kproxy"
       - "traefik.http.routers.kproxy.tls=true"
       - "traefik.http.routers.kproxy.tls.domains[0].main=omni.${DOMAIN}"
-      - "traefik.http.routers.kproxy.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.kproxy.service=kproxy"
       - "traefik.http.services.kproxy.loadbalancer.server.port=8100"
-      - "traefik.http.services.kproxy.loadbalancer.server.scheme=http" 
+      - "traefik.http.services.kproxy.loadbalancer.server.scheme=http"
     volumes:
       - ./omni:/_out
-      - ./omni/omni.asc:/omni.asc
+      - ./omni/omni.asc:${OMNI_PRIVATE_KEY_PATH}:ro
     networks:
       - ipv6
 
@@ -71,32 +63,21 @@ services:
     container_name: traefik
     image: traefik:v3.4.1
     restart: always
+    env_file: .env
     command:
       - --providers.docker=true
       - --api.dashboard=true
       - --log.level=INFO
       - --log.filePath=/var/log/traefik.log
-      - --serversTransport.insecureSkipVerify=true
-      # Set up LetsEncrypt
-      - --certificatesresolvers.letsencrypt.acme.dnschallenge=true
-      - --certificatesresolvers.letsencrypt.acme.dnschallenge.provider=cloudflare
-      - --certificatesresolvers.letsencrypt.acme.email=${CLOUDFLARE_EMAIL}
-      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
-      # Set up an insecure listener that redirects all traffic to TLS
+      - --serversTransport.insecureSkipVerify=false
       - --entrypoints.web.address=:80
       - --entrypoints.web.http.redirections.entrypoint.to=websecure
       - --entrypoints.web.http.redirections.entrypoint.scheme=https
       - --entrypoints.websecure.address=:443
-      # Set up the TLS configuration for our websecure listener
-      - --entrypoints.websecure.http.tls=true
-      - --entrypoints.websecure.http.tls.certResolver=letsencrypt
-      - --entrypoints.websecure.http.tls.domains[0].main=*.${DOMAIN}
-      # Set up the Omni endpoints
+      - --tls.stores.default.defaultcertificate.certFile=/certs/cert.pem
+      - --tls.stores.default.defaultcertificate.keyFile=/certs/privkey.pem
       - --entryPoints.mapi.address=:8090
       - --entryPoints.kproxy.address=:8100
-    environment:
-      - CLOUDFLARE_EMAIL=${CLOUDFLARE_EMAIL}
-      - CLOUDFLARE_DNS_API_TOKEN=${CLOUDFLARE_DNS_API_TOKEN}
     ports:
       - 80:80
       - 443:443
@@ -104,29 +85,26 @@ services:
       - 8100:8100
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
-      - "./certs:/letsencrypt"
+      - "./certs:/certs:ro"
       - "./traefik/logs/traefik.log:/var/log/traefik.log"
     labels:
       # Dashboard
       - "traefik.enable=true"
       - 'traefik.http.routers.traefik.rule=Host(`traefik-rpi1.${DOMAIN}`)'
       - "traefik.http.routers.traefik.entrypoints=websecure"
-      - "traefik.http.routers.traefik.tls.certresolver=letsencrypt"
       - "traefik.http.routers.traefik.service=api@internal"
       - 'traefik.http.routers.traefik.middlewares=strip'
       - 'traefik.http.middlewares.strip.stripprefix.prefixes=/traefik'
-      # middleware redirect
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
     extra_hosts: 
       - host.docker.internal:172.19.0.1
     networks:
       - ipv6
 
-
 networks:
   ipv6:
-    enable_ipv6: false
     driver: bridge
+    enable_ipv6: false
     ipam:
       driver: default
       config:
