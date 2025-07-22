@@ -1,7 +1,7 @@
 contexts:
-    default:
-        url: https://omni.ucdialplans.com/
-        auth:
-            siderov1:
-                identity: ken.lasko@gmail.com
+  default:
+    url: https://erauner.na-west-1.omni.siderolabs.io
+    auth:
+      siderov1:
+        identity: raunerevan@gmail.com
 context: default
