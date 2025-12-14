@@ -1,0 +1,9 @@
+context: erauner-erauner-home
+contexts:
+    erauner-erauner-home:
+        endpoints:
+            - https://erauner.na-west-1.omni.siderolabs.io
+        auth:
+            siderov1:
+                identity: raunerevan@gmail.com
+        cluster: erauner-home
