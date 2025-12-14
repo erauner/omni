@@ -91,6 +91,9 @@ systemExtensions:
   - siderolabs/iscsi-tools
   - siderolabs/util-linux-tools
   - siderolabs/btrfs
+  # AMD GPU support for hardware transcoding (Plex)
+  - siderolabs/amdgpu
+  - siderolabs/amd-ucode
 
 #######################################################################
 # ─── PER-NODE HOSTNAME + STATIC IP PATCHES ──────────────────────────
