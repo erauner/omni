@@ -104,18 +104,34 @@ Check [Image Factory](https://factory.talos.dev/) for available extensions.
 | `siderolabs/btrfs` | BTRFS filesystem |
 | `siderolabs/util-linux-tools` | Linux utilities |
 
-### Add Extensions
+### Add Extensions (Triggers Rolling Upgrade)
 
-In `cluster-template-home.yaml` under Workers:
+Adding or removing extensions triggers a rolling upgrade (same process as Talos version upgrade).
 
-```yaml
-systemExtensions:
-  - siderolabs/iscsi-tools
-  - siderolabs/amdgpu
-  - siderolabs/amd-ucode
-```
+1. **Edit `cluster-template-home.yaml`** under Workers (or ControlPlane):
+   ```yaml
+   systemExtensions:
+     - siderolabs/iscsi-tools
+     - siderolabs/amdgpu      # AMD GPU driver
+     - siderolabs/amd-ucode   # AMD microcode
+   ```
 
-Then sync: `omnictl cluster template sync -f cluster-template-home.yaml`
+2. **Preview and apply**:
+   ```bash
+   omnictl cluster template diff -f cluster-template-home.yaml
+   omnictl cluster template sync -f cluster-template-home.yaml
+   ```
+
+3. **Monitor** (extensions are installed via rolling upgrade):
+   ```bash
+   watch -n5 "omnictl cluster status erauner-home"
+   # Status will show: "Talos Upgrade InstallingExtensions current machine workerX"
+   ```
+
+4. **Verify extensions are loaded**:
+   ```bash
+   talosctl -n <node-ip> get extensions
+   ```
 
 ## Troubleshooting
 
@@ -166,31 +182,98 @@ omnictl get talosversions
 
 # Check current version
 kubectl get nodes -o wide  # OS-IMAGE column shows version
+
+# Check what Kubernetes versions are supported by a Talos version
+omnictl get talosversions -o yaml | grep -A5 "v1.11"
 ```
 
-### Upgrade Process
+### Upgrade Process (Step by Step)
 
-1. **Update `cluster-template-home.yaml`**:
-   ```yaml
-   talos:
-     version: v1.11.5  # Change to target version
-   ```
+#### 1. Pre-flight Checks
 
-2. **Validate and preview**:
-   ```bash
-   omnictl cluster template validate -f cluster-template-home.yaml
-   omnictl cluster template diff -f cluster-template-home.yaml
-   ```
+```bash
+# Check cluster health before starting
+omnictl cluster status erauner-home
 
-3. **Apply the upgrade**:
-   ```bash
-   omnictl cluster template sync -f cluster-template-home.yaml
-   ```
+# Verify all nodes are Ready
+kubectl get nodes
 
-4. **Monitor the rolling upgrade**:
-   ```bash
-   watch -n5 "omnictl cluster status erauner-home"
-   ```
+# Check current versions
+kubectl get nodes -o wide | awk '{print $1, $5, $9}'
+```
+
+#### 2. Update the Cluster Template
+
+Edit `cluster-template-home.yaml`:
+```yaml
+talos:
+  version: v1.11.5  # Change from current (e.g., v1.10.4) to target
+```
+
+#### 3. Validate and Preview Changes
+
+```bash
+# Validate template syntax
+omnictl cluster template validate -f cluster-template-home.yaml
+
+# Preview what will change (IMPORTANT - review this!)
+omnictl cluster template diff -f cluster-template-home.yaml
+```
+
+Example diff output:
+```diff
+-  talosversion: 1.10.4
++  talosversion: 1.11.5
+```
+
+#### 4. Apply the Upgrade (Triggers Rolling Upgrade)
+
+```bash
+# Sync template to trigger rolling upgrade
+omnictl cluster template sync -f cluster-template-home.yaml
+```
+
+#### 5. Monitor the Rolling Upgrade
+
+```bash
+# Watch the upgrade progress (updates every 5 seconds)
+watch -n5 "omnictl cluster status erauner-home"
+```
+
+**What you'll see during upgrade:**
+```
+Cluster "erauner-home" RUNNING Not Ready (3/4)
+├── Talos Upgrade Upgrading current machine controlplane1  ← Current node
+├── Control Plane Running Not Ready (0/1)
+│   └── Machine "xxx" UPGRADING                            ← Status
+└── Workers Running Ready (3/3)
+```
+
+The upgrade proceeds one node at a time:
+1. Control plane nodes first (maintains etcd quorum)
+2. Worker nodes one by one
+3. Each node: Cordon → Drain → Upgrade → Reboot → Rejoin → Uncordon
+
+#### 6. Verify Completion
+
+```bash
+# Final status should show all Ready
+omnictl cluster status erauner-home
+
+# Verify new version on all nodes
+kubectl get nodes -o wide
+
+# Check extensions are still loaded
+talosctl -n <node-ip> get extensions
+```
+
+#### 7. Commit Your Changes
+
+```bash
+git add cluster-template-home.yaml
+git commit -m "feat: upgrade Talos from v1.10.4 to v1.11.5"
+git push
+```
 
 ### Upgrade Path
 
