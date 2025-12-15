@@ -156,6 +156,76 @@ omnictl cluster machine lock erauner-home <machine-id>
 omnictl cluster machine unlock erauner-home <machine-id>
 ```
 
+## Upgrading Talos
+
+### Check Available Versions
+
+```bash
+# List available Talos versions
+omnictl get talosversions
+
+# Check current version
+kubectl get nodes -o wide  # OS-IMAGE column shows version
+```
+
+### Upgrade Process
+
+1. **Update `cluster-template-home.yaml`**:
+   ```yaml
+   talos:
+     version: v1.11.5  # Change to target version
+   ```
+
+2. **Validate and preview**:
+   ```bash
+   omnictl cluster template validate -f cluster-template-home.yaml
+   omnictl cluster template diff -f cluster-template-home.yaml
+   ```
+
+3. **Apply the upgrade**:
+   ```bash
+   omnictl cluster template sync -f cluster-template-home.yaml
+   ```
+
+4. **Monitor the rolling upgrade**:
+   ```bash
+   watch -n5 "omnictl cluster status erauner-home"
+   ```
+
+### Upgrade Path
+
+Always upgrade through adjacent minor versions:
+- v1.9.x → v1.10.x → v1.11.x (not v1.9.x → v1.11.x directly)
+
+### Supported Kubernetes Versions
+
+Each Talos version supports specific Kubernetes versions. Check compatibility:
+- [Talos Support Matrix](https://www.talos.dev/docs/support-matrix/)
+
+## Tool Version Management
+
+### Check Versions
+
+```bash
+# Check omnictl version vs backend
+omnictl version
+
+# Check talosctl version
+talosctl version --client
+```
+
+### Update Tools
+
+```bash
+# Update omnictl to match backend
+brew upgrade siderolabs/tap/omnictl
+
+# Update talosctl
+brew upgrade siderolabs/tap/talosctl
+```
+
+**Tip**: Keep `omnictl` version close to backend version to avoid compatibility issues.
+
 ## Architecture Reference
 
 | Config Layer | Managed By | Examples |
