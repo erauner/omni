@@ -1,5 +1,6 @@
 # Containerd registry mirrors for Nexus Docker proxies
-# Routes image pulls through Nexus cache with upstream fallback for bootstrap
+# Uses internal ClusterIP (HTTP) to bypass LB VIP intermittent timeouts
+# Falls back to upstream registries if Nexus is unavailable
 # See: https://github.com/erauner12/omni/issues/2
 machine:
   registries:
@@ -7,35 +8,41 @@ machine:
       # Docker Hub
       docker.io:
         endpoints:
-          - https://docker-hub.nexus.erauner.dev  # Nexus cache
-          - https://registry-1.docker.io          # Upstream fallback
+          - http://nexus-nexus3.registry.svc.cluster.local:5000  # Internal proxy
+          - https://registry-1.docker.io                          # Upstream fallback
 
       # GitHub Container Registry
       ghcr.io:
         endpoints:
-          - https://docker-ghcr.nexus.erauner.dev
+          - http://nexus-nexus3.registry.svc.cluster.local:5001
           - https://ghcr.io
 
       # Quay.io
       quay.io:
         endpoints:
-          - https://docker-quay.nexus.erauner.dev
+          - http://nexus-nexus3.registry.svc.cluster.local:5002
           - https://quay.io
 
       # LinuxServer.io
       lscr.io:
         endpoints:
-          - https://docker-lscr.nexus.erauner.dev
+          - http://nexus-nexus3.registry.svc.cluster.local:5003
           - https://lscr.io
 
       # Kubernetes registry
       registry.k8s.io:
         endpoints:
-          - https://docker-k8s.nexus.erauner.dev
+          - http://nexus-nexus3.registry.svc.cluster.local:5004
           - https://registry.k8s.io
 
       # AWS ECR Public
       public.ecr.aws:
         endpoints:
-          - https://docker-ecr.nexus.erauner.dev
+          - http://nexus-nexus3.registry.svc.cluster.local:5005
           - https://public.ecr.aws
+
+      # Nexus hosted registry (homelab images)
+      # No upstream fallback - this is the source of truth
+      docker.nexus.erauner.dev:
+        endpoints:
+          - http://nexus-nexus3.registry.svc.cluster.local:5010
