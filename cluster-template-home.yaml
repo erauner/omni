@@ -34,13 +34,16 @@ patches:
   - name: machine-registries
     file: ./patches/machine-registries.yaml
   # 🛑 DO NOT inject the "bgp=enable" label here—only Workers run the BGP speaker!
-  # - name: node-labels
-  #   inline:
-  #     machine:
-  #       kubelet:
-  #         extraArgs:
-  #           "node-labels": "bgp=enable"
-  # (Add machine-certs patch here only if you kept it)
+  # ✅ Add control-plane taint to prevent regular workloads from scheduling here.
+  # The 4-core Beelink is undersized compared to 16-core workers - keep it for
+  # kube-apiserver, etcd, controller-manager, scheduler, and CNI only.
+  # Added: 2026-01-21 after NodeSystemSaturation alert (load 14.5 on 4 cores)
+  - name: controlplane-taint
+    inline:
+      machine:
+        kubelet:
+          extraArgs:
+            register-with-taints: node-role.kubernetes.io/control-plane:NoSchedule
   - name: static-ip
     inline:
       machine:
