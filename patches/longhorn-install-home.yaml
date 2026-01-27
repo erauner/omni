@@ -171,7 +171,40 @@ cluster:
                     echo "Waiting for Longhorn components to be ready..."
                     kubectl -n longhorn-system wait --for=condition=ready pod -l app=longhorn-manager --timeout=600s
                     kubectl -n longhorn-system wait --for=condition=ready pod -l app=longhorn-driver-deployer --timeout=600s
-                    
+
+                    # Wait for CSI deployments to be created
+                    echo "Waiting for CSI deployments to be created..."
+                    sleep 30
+                    kubectl -n longhorn-system wait --for=condition=available deployment/csi-attacher --timeout=300s || true
+
+                    # Patch CSI deployments to avoid scheduling on control plane
+                    # Control plane doesn't run longhorn-manager (no storage), so CSI pods crash
+                    echo "Patching CSI deployments to exclude control plane nodes..."
+                    for deploy in csi-attacher csi-provisioner csi-resizer csi-snapshotter; do
+                      echo "Patching $deploy..."
+                      kubectl -n longhorn-system patch deployment $deploy --type=strategic -p '{
+                        "spec": {
+                          "replicas": 2,
+                          "template": {
+                            "spec": {
+                              "affinity": {
+                                "nodeAffinity": {
+                                  "requiredDuringSchedulingIgnoredDuringExecution": {
+                                    "nodeSelectorTerms": [{
+                                      "matchExpressions": [{
+                                        "key": "node-role.kubernetes.io/control-plane",
+                                        "operator": "DoesNotExist"
+                                      }]
+                                    }]
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }' || echo "Warning: Failed to patch $deploy (may not exist yet)"
+                    done
+
                     echo "Longhorn installation completed successfully!"
                 env:
                   - name: KUBERNETES_SERVICE_HOST
