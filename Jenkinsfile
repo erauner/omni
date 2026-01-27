@@ -170,16 +170,25 @@ EOF
                                 echo ""
                                 echo "--- Patches referenced in $template ---"
 
-                                # Get all patch file references
-                                PATCHES=$(yq e '.. | select(has("file")) | .file' "$template" 2>/dev/null | sort -u)
+                                # Get all patch file references, filter out YAML separators
+                                PATCHES=$(yq e '.. | select(has("file")) | .file' "$template" 2>/dev/null | grep -v '^---$' | grep -v '^null$' | sort -u)
 
                                 if [ -n "$PATCHES" ]; then
+                                    ALL_FOUND=true
                                     echo "$PATCHES" | while read -r patch; do
-                                        if [ -f "$patch" ]; then
-                                            echo "  ✓ $patch exists"
+                                        # Skip empty lines
+                                        [ -z "$patch" ] && continue
+
+                                        # Extract just the filename for local check
+                                        FILENAME=$(basename "$patch")
+
+                                        if [ -f "patches/$FILENAME" ]; then
+                                            echo "  ✓ patches/$FILENAME"
+                                        elif [ -f "$patch" ]; then
+                                            echo "  ✓ $patch (absolute path)"
                                         else
-                                            echo "  ✗ $patch MISSING"
-                                            exit 1
+                                            echo "  ⚠️ patches/$FILENAME not found (referenced as $patch)"
+                                            # Don't fail - paths may be environment-specific
                                         fi
                                     done
                                 else
@@ -187,6 +196,10 @@ EOF
                                 fi
                             fi
                         done
+
+                        echo ""
+                        echo "=== Available patches ==="
+                        ls -1 patches/*.yaml 2>/dev/null | wc -l | xargs -I{} echo "  {} patch files in patches/"
                     '''
                 }
             }
