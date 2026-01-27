@@ -1,0 +1,31 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: omni
+  title: Omni Cluster Infrastructure
+  description: Talos Kubernetes cluster templates and machine patches for Sidero Labs Omni - manages bare metal node configurations and cluster deployments
+  annotations:
+    github.com/project-slug: erauner12/omni
+    homelab.dev/manifest-name: omni
+  tags:
+    - talos
+    - kubernetes
+    - infrastructure
+    - bare-metal
+    - omni
+    - gitops
+  links:
+    - url: https://github.com/erauner12/omni
+      title: GitHub Repository
+      icon: github
+    - url: https://omni.siderolabs.com
+      title: Sidero Labs Omni Documentation
+      icon: docs
+    - url: https://www.talos.dev
+      title: Talos Linux Documentation
+      icon: docs
+spec:
+  type: infrastructure
+  owner: platform-team
+  lifecycle: production
+  system: homelab-infrastructure
