@@ -7,5 +7,5 @@ machine:
         [plugins]
           [plugins."io.containerd.cri.v1.images"]
             discard_unpacked_layers = false
-      path: /etc/cri/conf.d/20-spegel.toml
+      path: /etc/cri/conf.d/20-customization.part
       op: create
